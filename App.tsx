@@ -7,6 +7,149 @@ import { Zap, Shield, Sword, Hammer, Settings, Users, Play, Clock, CheckCircle, 
 
 // --- NEW COMPONENTS ---
 
+const UnitArt = ({ unit, factionType, animation }: { unit: Unit, factionType: FactionType, animation?: string }) => {
+    // Determine colors
+    const colors = {
+        Antz: { body: '#ef4444', detail: '#991b1b', leg: '#7f1d1d' }, // Red
+        Beetlez: { body: '#3b82f6', detail: '#1e3a8a', leg: '#172554' }, // Blue
+        Beez: { body: '#eab308', detail: '#000000', leg: '#422006' }, // Yellow/Black
+        Mantiz: { body: '#22c55e', detail: '#14532d', leg: '#064e3b' }, // Green
+    }[factionType];
+
+    // Determine shapes based on Unit Type (Builder, Pounder, Striker) and Tier (implied by ID suffix)
+    // ID conventions: _w (worker), _l (laborer), _c (constructor) -> Tier 1, 2, 3 Builder
+    const idParts = unit.id.split('_');
+    const suffix = idParts[1] || '';
+    
+    // Size/Scale based on tier roughly
+    const scale = ['w', 't', 'f', 'du', 'm'].includes(suffix) ? 0.8 : 
+                  ['c', 'd', 'k', 'sh', 'h'].includes(suffix) ? 1.2 : 1.0;
+
+    const renderBody = () => {
+        switch(factionType) {
+            case 'Antz':
+                return (
+                    <g>
+                        {/* Rear */}
+                        <ellipse cx="50" cy="70" rx="15" ry="12" fill={colors.body} stroke={colors.detail} strokeWidth="2" />
+                        {/* Mid */}
+                        <ellipse cx="50" cy="50" rx="10" ry="10" fill={colors.body} stroke={colors.detail} strokeWidth="2" />
+                        {/* Head */}
+                        <circle cx="50" cy="30" r="12" fill={colors.body} stroke={colors.detail} strokeWidth="2" />
+                        {/* Eyes */}
+                        <circle cx="45" cy="25" r="3" fill="white" />
+                        <circle cx="55" cy="25" r="3" fill="white" />
+                        <circle cx="45" cy="25" r="1" fill="black" />
+                        <circle cx="55" cy="25" r="1" fill="black" />
+                    </g>
+                );
+            case 'Beetlez':
+                return (
+                    <g>
+                        {/* Shell */}
+                        <path d="M 30 40 Q 50 10 70 40 L 70 75 Q 50 85 30 75 Z" fill={colors.body} stroke={colors.detail} strokeWidth="3" />
+                        {/* Split line */}
+                        <line x1="50" y1="40" x2="50" y2="75" stroke={colors.detail} strokeWidth="2" />
+                        {/* Head */}
+                        <path d="M 35 40 L 65 40 L 60 25 L 40 25 Z" fill={colors.detail} />
+                        {/* Horn for Pounders */}
+                        {unit.type === 'Pounder' && <path d="M 45 25 L 50 10 L 55 25" fill={colors.detail} stroke="black" />}
+                    </g>
+                );
+            case 'Beez':
+                return (
+                    <g>
+                        {/* Wings */}
+                        <ellipse cx="30" cy="50" rx="20" ry="10" transform="rotate(-45 30 50)" fill="rgba(255,255,255,0.7)" stroke="#cbd5e1" />
+                        <ellipse cx="70" cy="50" rx="20" ry="10" transform="rotate(45 70 50)" fill="rgba(255,255,255,0.7)" stroke="#cbd5e1" />
+                        {/* Body Stripes */}
+                        <ellipse cx="50" cy="50" rx="18" ry="25" fill={colors.body} stroke={colors.detail} strokeWidth="2" />
+                        <path d="M 35 45 Q 50 50 65 45" stroke="black" strokeWidth="4" fill="none" />
+                        <path d="M 33 55 Q 50 60 67 55" stroke="black" strokeWidth="4" fill="none" />
+                        {/* Head */}
+                        <circle cx="50" cy="25" r="14" fill="black" />
+                        <circle cx="45" cy="22" r="4" fill="white" opacity="0.8" />
+                        <circle cx="55" cy="22" r="4" fill="white" opacity="0.8" />
+                    </g>
+                );
+            case 'Mantiz':
+                return (
+                    <g>
+                        {/* Abdomen */}
+                        <path d="M 50 50 Q 60 70 50 90 Q 40 70 50 50" fill={colors.body} stroke={colors.detail} strokeWidth="2" />
+                        {/* Thorax */}
+                        <line x1="50" y1="50" x2="50" y2="30" stroke={colors.body} strokeWidth="6" />
+                        {/* Head */}
+                        <path d="M 40 30 L 60 30 L 50 15 Z" fill={colors.body} stroke={colors.detail} />
+                        {/* Scythes */}
+                        <path d="M 50 35 L 20 45 L 30 20" fill="none" stroke={colors.leg} strokeWidth="3" />
+                        <path d="M 50 35 L 80 45 L 70 20" fill="none" stroke={colors.leg} strokeWidth="3" />
+                    </g>
+                );
+        }
+    };
+
+    const renderLegs = () => {
+        // Generic legs
+        return (
+            <g stroke={colors.leg} strokeWidth="2" fill="none">
+                <path d="M 50 45 L 20 35" />
+                <path d="M 50 45 L 80 35" />
+                <path d="M 50 55 L 15 55" />
+                <path d="M 50 55 L 85 55" />
+                <path d="M 50 65 L 20 75" />
+                <path d="M 50 65 L 80 75" />
+            </g>
+        );
+    };
+
+    const renderWeapon = () => {
+        if (unit.type === 'Striker') {
+            return <path d="M 40 10 L 50 0 L 60 10" stroke="red" strokeWidth="3" fill="none" />;
+        }
+        if (unit.type === 'Pounder') {
+            return <circle cx="50" cy="15" r="5" fill="#475569" />;
+        }
+        // Builder gets a little wrench/tool icon or mandibles
+        return <path d="M 45 10 L 45 20 M 55 10 L 55 20" stroke={colors.detail} strokeWidth="2" />;
+    };
+
+    const animClass = 
+        animation === 'IDLE' ? 'animate-idle' :
+        animation === 'MOVE_UP' ? 'animate-move-up' :
+        animation === 'MOVE_DOWN' ? 'animate-move-down' :
+        animation === 'MOVE_LEFT' ? 'animate-move-left' :
+        animation === 'MOVE_RIGHT' ? 'animate-move-right' :
+        animation === 'ATTACK_UP' ? 'animate-lunge-up' :
+        animation === 'ATTACK_DOWN' ? 'animate-lunge-down' :
+        animation === 'ATTACK_LEFT' ? 'animate-lunge-left' :
+        animation === 'ATTACK_RIGHT' ? 'animate-lunge-right' :
+        animation === 'DEATH' ? 'animate-death' : '';
+
+    return (
+        <svg 
+            viewBox="0 0 100 100" 
+            className={`w-full h-full drop-shadow-lg ${animClass}`}
+            style={{ transformOrigin: 'center' }}
+        >
+            {renderLegs()}
+            {renderBody()}
+            {renderWeapon()}
+            
+            {/* Health Bar Ring */}
+            <circle cx="50" cy="50" r="45" fill="none" stroke="rgba(0,0,0,0.2)" strokeWidth="3" />
+            <circle 
+                cx="50" cy="50" r="45" fill="none" 
+                stroke={unit.currentHealth < unit.maxHealth * 0.4 ? "#ef4444" : "#22c55e"} 
+                strokeWidth="3" 
+                strokeDasharray={`${(unit.currentHealth/unit.maxHealth) * 280} 280`}
+                transform="rotate(-90 50 50)"
+                strokeLinecap="round"
+            />
+        </svg>
+    );
+}
+
 const HowToPlay = ({ onBack }: { onBack: () => void }) => {
   return (
     <div className="min-h-screen bg-green-50 p-4 font-sans flex flex-col items-center z-50">
@@ -422,15 +565,12 @@ const Game = ({ state, playerId, onBuildOrder, onEndPhase, activeAnimation }: {
                   >
                       {/* Unit */}
                       {unit && (
-                          <div className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center text-xs font-bold shadow-md relative z-10 transition-transform duration-300
-                              ${unit.ownerId === playerId ? 'bg-green-600 text-white' : 'bg-red-500 text-white'}
-                              ${activeAnimation?.targetId === unit.instanceId && activeAnimation.type === 'ATTACK' ? 'animate-bounce' : ''}
-                          `}>
-                              {unit.name.substring(0,2)}
-                              {/* HP Bar */}
-                              <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-8 h-1 bg-gray-200 rounded-full overflow-hidden">
-                                  <div className={`h-full ${unit.ownerId === playerId ? 'bg-green-400' : 'bg-red-300'}`} style={{width: `${(unit.currentHealth / unit.maxHealth) * 100}%`}}></div>
-                              </div>
+                          <div className={`w-10 h-10 md:w-14 md:h-14 flex items-center justify-center relative z-10 transition-transform duration-300`}>
+                              <UnitArt 
+                                  unit={unit} 
+                                  factionType={state.players.find(p => p.id === unit.ownerId)?.faction as FactionType}
+                                  animation={activeAnimation?.targetId === unit.instanceId ? activeAnimation.type === 'ATTACK' ? `ATTACK_${activeAnimation.direction}` : activeAnimation.type : 'IDLE'}
+                              />
                           </div>
                       )}
                       
@@ -523,10 +663,9 @@ const Game = ({ state, playerId, onBuildOrder, onEndPhase, activeAnimation }: {
                                     ${!canAfford ? 'opacity-40 grayscale' : ''}
                                 `}
                             >
-                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold mb-1 text-white
-                                    ${u.type === 'Striker' ? 'bg-red-500' : u.type === 'Pounder' ? 'bg-blue-500' : 'bg-orange-400'}
-                                `}>
-                                    {u.name.substring(0,1)}
+                                <div className={`w-8 h-8 flex items-center justify-center mb-1`}>
+                                     {/* Mini preview for button */}
+                                     <UnitArt unit={{...u, currentHealth: u.health, maxHealth: u.health, instanceId: 'preview', ownerId: 'preview', x: 0, y: 0, hasActed: false}} factionType={me.faction as FactionType} animation="IDLE" />
                                 </div>
                                 <div className="font-bold text-xs text-gray-700 truncate w-full text-center">{u.name}</div>
                                 <div className="text-[10px] font-bold text-yellow-600 bg-yellow-50 px-2 py-0.5 rounded-full mt-1">{u.cost}</div>
@@ -592,6 +731,18 @@ export default function App() {
   }, [myId]);
 
   const [buildOrders, setBuildOrders] = useState<BuildOrder[]>([]);
+  
+  // Host state for collecting orders
+  const [hostOrders, setHostOrders] = useState<BuildOrder[] | null>(null);
+  const [clientOrders, setClientOrders] = useState<BuildOrder[] | null>(null);
+
+  useEffect(() => {
+      if (gameState.phase === 'BUILDING') {
+          setHostOrders(null);
+          setClientOrders(null);
+          setBuildOrders([]);
+      }
+  }, [gameState.phase]);
 
   useEffect(() => {
     peerService.initialize((id) => {
@@ -688,8 +839,13 @@ export default function App() {
               startPreGameCountdown();
               break;
           case 'SUBMIT_BUILD_ORDERS':
-              if (gameStateRef.current.players[0].id === myIdRef.current) {
-                  processBuildPhase();
+              if (gameStateRef.current.players[0].id === myIdRef.current) { // Am Host
+                  setClientOrders(msg.payload);
+                  // Check if we are ready to resolve (Host already finished)
+                  // We need to check the Ref or state, but since setHostOrders is async, we might rely on the value being present or the flow
+                  if (hostOrders) {
+                      resolveBuildPhase(hostOrders, msg.payload);
+                  }
               }
               break;
           case 'PHASE_CHANGE':
@@ -791,25 +947,71 @@ export default function App() {
            if (myIdRef.current === currentState.players[0].id) peerService.sendMessage({ type: 'SYNC_STATE', payload: buildState });
       }, 3000);
   };
+  
+  const resolveBuildPhase = (p1Orders: BuildOrder[], p2Orders: BuildOrder[]) => {
+       const currentState = gameStateRef.current;
+       const nextState = JSON.parse(JSON.stringify(currentState));
+       
+       // Process P1 (Host)
+       p1Orders.forEach(o => {
+           if (o.type === 'BUILD_UNIT') {
+               const p1Index = 0;
+               const faction = FACTIONS[nextState.players[p1Index].faction as FactionType];
+               const stats = faction.units.find(u => u.id === o.unitId);
+               if (stats && nextState.players[p1Index].resources >= stats.cost) {
+                    nextState.players[p1Index].resources -= stats.cost;
+                    nextState.units.push({
+                        ...stats,
+                        instanceId: Math.random().toString(),
+                        ownerId: nextState.players[p1Index].id,
+                        x: o.targetX,
+                        y: o.targetY,
+                        currentHealth: stats.health,
+                        hasActed: false,
+                        maxHealth: stats.health
+                    });
+                    nextState.players[p1Index].unitsBuilt++;
+               }
+           }
+       });
 
-  const processBuildPhase = () => {
-      // Use Ref to ensure we have latest orders/state
-      let newState = {...gameStateRef.current};
-      
-      // ... (Unlock Logic omitted for brevity, focusing on phase transition) ...
+       // Process P2 (Client)
+       p2Orders.forEach(o => {
+           if (o.type === 'BUILD_UNIT') {
+               const p2Index = 1;
+               const faction = FACTIONS[nextState.players[p2Index].faction as FactionType];
+               const stats = faction.units.find(u => u.id === o.unitId);
+               if (stats && nextState.players[p2Index].resources >= stats.cost) {
+                    nextState.players[p2Index].resources -= stats.cost;
+                    nextState.units.push({
+                        ...stats,
+                        instanceId: Math.random().toString(),
+                        ownerId: nextState.players[p2Index].id,
+                        x: o.targetX,
+                        y: o.targetY,
+                        currentHealth: stats.health,
+                        hasActed: false,
+                        maxHealth: stats.health
+                    });
+                    nextState.players[p2Index].unitsBuilt++;
+               }
+           }
+       });
 
-      const actionState = {
-          ...newState,
-          phase: 'ACTION' as const,
-          phaseTimeRemaining: 0,
-          actionQueue: newState.units.map(u => u.instanceId),
-          currentActorIndex: 0
-      };
-      setGameState(actionState);
-      peerService.sendMessage({ type: 'SYNC_STATE', payload: actionState });
-      
-      // Start processing actions loop
-      processActionTurn(actionState);
+       // Transition
+       const actionState = { 
+           ...nextState, 
+           phase: 'ACTION' as const,
+           phaseTimeRemaining: 0,
+           actionQueue: nextState.units.map((u: Unit) => u.instanceId),
+           currentActorIndex: 0
+       };
+       
+       setGameState(actionState);
+       peerService.sendMessage({ type: 'SYNC_STATE', payload: actionState });
+       
+       // Start Action Logic
+       processActionTurn(actionState);
   };
   
   // Recursively process units
@@ -1006,40 +1208,22 @@ export default function App() {
 
   const handlePhaseEnd = (phase: string) => {
       if (phase === 'BUILDING') {
-          if (myId === gameState.players[0].id) {
-               // I am host, process my orders then switch
-               const next = {...gameState};
-               buildOrders.forEach(o => {
-                   if (o.type === 'BUILD_UNIT') {
-                       const faction = FACTIONS[next.players[0].faction as FactionType];
-                       const stats = faction.units.find(u => u.id === o.unitId);
-                       if (stats && next.players[0].resources >= stats.cost) {
-                            next.players[0].resources -= stats.cost;
-                            next.units.push({
-                                ...stats,
-                                instanceId: Math.random().toString(),
-                                ownerId: myId,
-                                x: o.targetX,
-                                y: o.targetY,
-                                currentHealth: stats.health,
-                                hasActed: false,
-                                maxHealth: stats.health
-                            });
-                            next.players[0].unitsBuilt++;
-                       }
-                   }
-               });
-               
-               const actionState = { ...next, phase: 'ACTION' as const };
-               setGameState(actionState);
-               peerService.sendMessage({ type: 'SYNC_STATE', payload: actionState });
-               
-               // Start Action Logic
-               processActionTurn(actionState);
-          } else {
-             // Client logic (omitted)
+          if (myId === gameState.players[0].id) { // Is Host
+               setHostOrders(buildOrders);
+               if (clientOrders) {
+                   // Both ready
+                   resolveBuildPhase(buildOrders, clientOrders);
+               } else {
+                   // Waiting for client... 
+                   // TODO: Show UI or handle timeout. 
+                   // For now, if timer runs out, maybe just resolve with empty?
+                   // We rely on client sending orders before phase ends or on timeout.
+               }
+          } else { // Is Client
+             peerService.sendMessage({ type: 'SUBMIT_BUILD_ORDERS', payload: buildOrders });
           }
       }
+      setBuildOrders([]);
   };
 
 
