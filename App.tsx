@@ -781,7 +781,7 @@ export default function App() {
               break;
           case 'SUBMIT_BUILD_ORDERS':
               if (gameState.players[0].id === myId) {
-                  processBuildPhase(msg.payload);
+                  processBuildPhase();
               }
               break;
           case 'PHASE_CHANGE':
@@ -881,7 +881,7 @@ export default function App() {
       }, 3000);
   };
 
-  const processBuildPhase = (remoteOrders?: BuildOrder[]) => {
+  const processBuildPhase = () => {
       // Logic for processing orders locally if needed, but currently unused so removed
       let newState = {...gameState};
       
