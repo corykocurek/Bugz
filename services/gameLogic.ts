@@ -1,23 +1,8 @@
-import { Unit, FactionType, GameState } from '../types';
-import { FACTIONS } from '../constants';
+import { FactionType, GameState } from '../types';
 
 // Helper to check if a space is owned by a player
 export const isSpaceOwned = (x: number, y: number, pylons: number[][], playerId: string, gameState: GameState): boolean => {
-  // A space is owned if all 4 corners have pylons > 0
-  // But wait, pylons don't have "owner" IDs in the simple model, they just exist.
-  // The prompt says "4 raised pylons enclose and control a space for the player who owns those pylons."
-  // This implies Pylons must have ownership.
-  // Let's refine the pylon model. 
-  // Since we can't change the types easily now without rewriting everything, we assume pylon ownership 
-  // is inferred by who built them or by simple proximity/zone logic? 
-  // No, "Pylons start with 1 health...". 
-  // Simpler approach: We need to store ownership in the pylon grid.
-  // Since pylon is number[][], let's assume positive = Player 1 (Host), negative = Player 2 (Client).
-  // 0 = empty. 1 to 5 = P1 HP 1-5. -1 to -5 = P2 HP 1-5.
-  
-  // Actually, let's stick to this convention:
-  // > 0 is Host (P1)
-  // < 0 is Client (P2)
+  // A space is owned if all 4 corners have pylons > 0 for host or < 0 for client
   
   // Corners: (x,y), (x+1,y), (x,y+1), (x+1,y+1)
   const c1 = pylons[x][y];
@@ -64,7 +49,7 @@ export const findPath = (
   targetY: number, 
   pylons: number[][], 
   maxMove: number,
-  faction: FactionType,
+  _faction: FactionType,
   ownerId: string,
   players: any[]
 ): {x: number, y: number}[] | null => {

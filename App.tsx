@@ -1,9 +1,9 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { NetworkMessage, GameState, PlayerState, Unit, BuildOrder, FactionType, UnitStats } from './types';
 import { peerService } from './services/peerService';
-import { FACTIONS, BOARD_SIZE, INITIAL_UNLOCKS, PHASE_DURATION } from './constants';
-import { calculateResources, getPylonOwner, getPylonHealth, findPath, isSpaceOwned } from './services/gameLogic';
-import { Zap, Shield, Sword, Hammer, Settings, Users, Play, Clock, CheckCircle, HelpCircle, ArrowLeft, BookOpen } from 'lucide-react';
+import { FACTIONS, BOARD_SIZE, INITIAL_UNLOCKS } from './constants';
+import { calculateResources, getPylonOwner, getPylonHealth, isSpaceOwned } from './services/gameLogic';
+import { Zap, Shield, Sword, Hammer, Settings, Users, Play, Clock, CheckCircle, ArrowLeft, BookOpen } from 'lucide-react';
 
 // --- NEW COMPONENTS ---
 
@@ -178,10 +178,9 @@ const HomeScreen = ({ onCreate, onJoin, onHowToPlay }: any) => {
 
 // --- EXISTING COMPONENTS ---
 
-const Lobby = ({ myId, peerIdInput, setPeerIdInput, joinGame, isHost, players, myPlayerId, onReady, onFactionSelect, chatMessages, sendChat, startGame, status }: any) => {
+const Lobby = ({ myId, peerIdInput, setPeerIdInput, joinGame, players, myPlayerId, onReady, onFactionSelect, chatMessages, sendChat, status }: any) => {
   const me = players.find((p: PlayerState) => p.id === myPlayerId);
   const opponent = players.find((p: PlayerState) => p.id !== myPlayerId);
-  const allReady = players.length === 2 && players.every((p: PlayerState) => p.isReady);
 
   return (
     <div className="min-h-screen bg-green-50 p-4 flex flex-col font-sans">
@@ -324,7 +323,7 @@ const Lobby = ({ myId, peerIdInput, setPeerIdInput, joinGame, isHost, players, m
 };
 
 // Main Game Component
-const Game = ({ state, playerId, onBuildOrder, onEndPhase, sendChat, activeAnimation }: any) => {
+const Game = ({ state, playerId, onBuildOrder, onEndPhase, activeAnimation }: any) => {
     const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
     const [menuTab, setMenuTab] = useState<'build' | 'tech'>('build');
     const [startTimer, setStartTimer] = useState<number | null>(3);
@@ -883,9 +882,7 @@ export default function App() {
   };
 
   const processBuildPhase = (remoteOrders?: BuildOrder[]) => {
-      const myOrders = buildOrders; // Host orders
-      const clientOrders = remoteOrders || [];
-      
+      // Logic for processing orders locally if needed, but currently unused so removed
       let newState = {...gameState};
       
       // ... (Unlock Logic omitted for brevity, focusing on phase transition) ...
@@ -1027,7 +1024,7 @@ export default function App() {
            if (currentUnit.type === 'Striker') {
                const targetData = getAdjacentEnemy();
                if (targetData) {
-                   const { index: enemyIndex, unit: enemy, direction } = targetData;
+                   const { unit: enemy, direction } = targetData;
                    
                     // 1. Broadcast Animation
                    const animPayload = { 
@@ -1202,7 +1199,6 @@ export default function App() {
         peerIdInput={peerIdInput}
         setPeerIdInput={setPeerIdInput}
         joinGame={joinGame}
-        isHost={gameState.players[0]?.id === myId}
         players={gameState.players}
         myPlayerId={myId}
         onReady={onReady}
@@ -1220,7 +1216,6 @@ export default function App() {
         playerId={myId} 
         onBuildOrder={handleBuildOrder}
         onEndPhase={() => handlePhaseEnd(gameState.phase)}
-        sendChat={sendChat}
         activeAnimation={activeAnimation}
     />
   );
