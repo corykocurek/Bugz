@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { NetworkMessage, GameState, PlayerState, Unit, BuildOrder, FactionType } from './types';
 import { peerService } from './services/peerService';
 import { FACTIONS, BOARD_SIZE, INITIAL_UNLOCKS } from './constants';
@@ -579,6 +579,18 @@ export default function App() {
       currentActorIndex: 0
   });
 
+  // Refs for State to avoid stale closures in listeners
+  const gameStateRef = useRef(gameState);
+  const myIdRef = useRef(myId);
+
+  useEffect(() => {
+      gameStateRef.current = gameState;
+  }, [gameState]);
+
+  useEffect(() => {
+      myIdRef.current = myId;
+  }, [myId]);
+
   const [buildOrders, setBuildOrders] = useState<BuildOrder[]>([]);
 
   useEffect(() => {
@@ -638,7 +650,8 @@ export default function App() {
   const handleNetworkMessage = (msg: NetworkMessage) => {
       switch(msg.type) {
           case 'JOIN':
-               if (gameState.players.length === 1) {
+               // Use Ref to check current player count safely
+               if (gameStateRef.current.players.length === 1) {
                    const newPlayer: PlayerState = {
                        id: msg.payload.id,
                        name: 'Player 2',
@@ -649,8 +662,12 @@ export default function App() {
                        unitsBuilt: 0,
                        unitsKilled: 0
                    };
-                   const newRec = {...gameState, players: [...gameState.players, newPlayer]};
+                   // We must update based on current Ref to avoid race conditions if possible, but React state setter is best practice for updates
+                   // Here we construct the new state from Ref to ensure we have the latest host player data
+                   const newRec = {...gameStateRef.current, players: [...gameStateRef.current.players, newPlayer]};
+                   
                    setGameState(newRec);
+                   // Send the *updated* state immediately
                    peerService.sendMessage({ type: 'SYNC_STATE', payload: newRec });
                }
                break;
@@ -671,7 +688,7 @@ export default function App() {
               startPreGameCountdown();
               break;
           case 'SUBMIT_BUILD_ORDERS':
-              if (gameState.players[0].id === myId) {
+              if (gameStateRef.current.players[0].id === myIdRef.current) {
                   processBuildPhase();
               }
               break;
@@ -708,9 +725,12 @@ export default function App() {
   };
 
   const initializeGame = () => {
+      // Use Ref to get latest state (including players who might have readied up or chatted)
+      const current = gameStateRef.current;
+      
       const newPylons = Array(8).fill(0).map(() => Array(8).fill(0));
-      const p1 = gameState.players[0];
-      const p2 = gameState.players[1];
+      const p1 = current.players[0];
+      const p2 = current.players[1];
       
       const setPylon = (x: number, y: number, val: number) => {
           newPylons[x][y] = val;
@@ -731,16 +751,16 @@ export default function App() {
       });
 
       const newState: GameState = {
-          ...gameState,
+          ...current,
           phase: 'STARTING', 
           pylons: newPylons,
           units: units,
-          players: gameState.players.map(p => ({...p, unlockedUnits: INITIAL_UNLOCKS[p.faction as FactionType]})),
+          players: current.players.map(p => ({...p, unlockedUnits: INITIAL_UNLOCKS[p.faction as FactionType]})),
           phaseTimeRemaining: 3
       };
       
       setGameState(newState);
-      if (myId === p1.id) peerService.sendMessage({ type: 'SYNC_STATE', payload: newState });
+      if (myIdRef.current === p1.id) peerService.sendMessage({ type: 'SYNC_STATE', payload: newState });
 
       setTimeout(() => {
           startResourcePhase(newState);
@@ -763,18 +783,18 @@ export default function App() {
       };
       
       setGameState(nextState);
-      if (myId === currentState.players[0].id) peerService.sendMessage({ type: 'SYNC_STATE', payload: nextState });
+      if (myIdRef.current === currentState.players[0].id) peerService.sendMessage({ type: 'SYNC_STATE', payload: nextState });
 
       setTimeout(() => {
            const buildState = {...nextState, phase: 'BUILDING' as const, phaseTimeRemaining: 60};
            setGameState(buildState);
-           if (myId === currentState.players[0].id) peerService.sendMessage({ type: 'SYNC_STATE', payload: buildState });
+           if (myIdRef.current === currentState.players[0].id) peerService.sendMessage({ type: 'SYNC_STATE', payload: buildState });
       }, 3000);
   };
 
   const processBuildPhase = () => {
-      // Logic for processing orders locally if needed, but currently unused so removed
-      let newState = {...gameState};
+      // Use Ref to ensure we have latest orders/state
+      let newState = {...gameStateRef.current};
       
       // ... (Unlock Logic omitted for brevity, focusing on phase transition) ...
 
