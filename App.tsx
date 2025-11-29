@@ -3,7 +3,7 @@ import { NetworkMessage, GameState, PlayerState, Unit, BuildOrder, FactionType, 
 import { peerService } from './services/peerService';
 import { FACTIONS, BOARD_SIZE, INITIAL_UNLOCKS } from './constants';
 import { calculateResources, getPylonOwner, getPylonHealth, isSpaceOwned } from './services/gameLogic';
-import { Zap, Shield, Sword, Hammer, Settings, Users, Play, Clock, CheckCircle, ArrowLeft, BookOpen } from 'lucide-react';
+import { Zap, Shield, Sword, Hammer, Settings, Users, Play, Clock, CheckCircle, ArrowLeft, BookOpen, Copy, Check } from 'lucide-react';
 
 // --- NEW COMPONENTS ---
 
@@ -178,105 +178,172 @@ const HomeScreen = ({ onCreate, onJoin, onHowToPlay }: any) => {
 
 // --- EXISTING COMPONENTS ---
 
-const Lobby = ({ myId, peerIdInput, setPeerIdInput, joinGame, players, myPlayerId, onReady, onFactionSelect, chatMessages, sendChat, status }: any) => {
+const Lobby = ({ myId, isHost, peerIdInput, setPeerIdInput, joinGame, players, myPlayerId, onReady, onFactionSelect, chatMessages, sendChat, status, onBack }: any) => {
   const me = players.find((p: PlayerState) => p.id === myPlayerId);
   const opponent = players.find((p: PlayerState) => p.id !== myPlayerId);
+  const [copied, setCopied] = useState(false);
+
+  const copyToClipboard = () => {
+      navigator.clipboard.writeText(myId);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+  };
 
   return (
     <div className="min-h-screen bg-green-50 p-4 flex flex-col font-sans">
-      <div className="flex items-center justify-center relative mb-6">
-          <h1 className="text-3xl font-extrabold text-green-800 tracking-tight">Lobby</h1>
+      <div className="flex items-center justify-between relative mb-6">
+           <button onClick={onBack} className="text-gray-500 hover:bg-gray-200 p-2 rounded-full">
+               <ArrowLeft size={24} />
+           </button>
+          <h1 className="text-3xl font-extrabold text-green-800 tracking-tight">{isHost ? 'Create Lobby' : 'Join Lobby'}</h1>
+          <div className="w-10"></div>
       </div>
       
-      <div className="bg-white rounded-2xl shadow-xl p-6 mb-6 border-2 border-green-100">
-        <div className="flex flex-col gap-4">
-            <div className="flex flex-col md:flex-row justify-between items-center bg-gray-50 p-3 rounded-lg gap-3">
-                <span className="font-semibold text-gray-600">Your Connection ID:</span>
-                <div className="flex gap-2 w-full md:w-auto">
-                    <code className="flex-1 bg-gray-200 px-3 py-2 rounded text-sm font-mono select-all text-gray-800 text-center">{myId || 'Connecting...'}</code>
-                </div>
-            </div>
-          {!status.connected && (
-             <div className="flex flex-col md:flex-row gap-2 mt-2">
-              <input 
-                type="text" 
-                placeholder="Enter Opponent's ID to Join"
-                className="flex-1 border-2 border-gray-200 rounded-lg p-3 focus:outline-none focus:border-green-500 transition-colors"
-                value={peerIdInput}
-                onChange={(e) => setPeerIdInput(e.target.value)}
-              />
-              <button 
-                onClick={joinGame}
-                className="bg-green-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-green-700 transition-colors shadow-sm"
-              >
-                Connect
-              </button>
-            </div>
-          )}
-          {status.connected && (
-            <div className="text-green-600 font-bold flex items-center justify-center gap-2 bg-green-50 p-3 rounded-lg animate-pulse">
-                <Users size={20} />
-                Connected to opponent
-            </div>
-          )}
-        </div>
-      </div>
+      {!status.connected ? (
+          <div className="flex-1 flex flex-col items-center justify-center max-w-lg mx-auto w-full">
+               <div className="bg-white rounded-2xl shadow-xl p-8 border-2 border-green-100 w-full text-center">
+                   {isHost ? (
+                       <>
+                        <h2 className="text-2xl font-bold text-gray-800 mb-4">Your Game Code</h2>
+                        <div className="flex items-center gap-2 mb-6 justify-center">
+                            <code className="bg-gray-100 px-6 py-4 rounded-xl text-2xl font-mono tracking-widest font-bold text-green-700 select-all border border-gray-200">
+                                {myId || 'Generating...'}
+                            </code>
+                            <button 
+                                onClick={copyToClipboard}
+                                className="bg-gray-100 hover:bg-green-100 text-gray-600 hover:text-green-700 p-4 rounded-xl transition-colors"
+                                title="Copy Code"
+                            >
+                                {copied ? <Check size={24} /> : <Copy size={24} />}
+                            </button>
+                        </div>
+                        <div className="flex flex-col items-center gap-3">
+                            <div className="w-12 h-12 border-4 border-green-200 border-t-green-600 rounded-full animate-spin"></div>
+                            <p className="text-gray-500 font-medium animate-pulse">Waiting for opponent to join...</p>
+                        </div>
+                        <div className="mt-8 text-sm text-gray-400">
+                            Share this code with your friend so they can join.
+                        </div>
+                       </>
+                   ) : (
+                       <>
+                        <h2 className="text-2xl font-bold text-gray-800 mb-4">Enter Game Code</h2>
+                        <input 
+                            type="text" 
+                            placeholder="Paste Host Code Here"
+                            className="w-full border-2 border-gray-200 rounded-xl p-4 text-center text-xl font-mono mb-4 focus:outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100 transition-all uppercase"
+                            value={peerIdInput}
+                            onChange={(e) => setPeerIdInput(e.target.value)}
+                        />
+                        <button 
+                            onClick={joinGame}
+                            disabled={!peerIdInput}
+                            className="w-full bg-green-600 text-white px-6 py-4 rounded-xl font-bold text-xl hover:bg-green-700 transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        >
+                            <Play fill="currentColor" /> Join Game
+                        </button>
+                       </>
+                   )}
+               </div>
+          </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 max-w-7xl mx-auto w-full">
+          {/* Left Column: My Setup */}
+          <div className="lg:col-span-5 flex flex-col gap-4">
+              <div className="bg-white rounded-2xl shadow-xl p-6 border-2 border-green-100 flex-1 flex flex-col">
+                 <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                        <Shield className="text-green-600" /> Select Faction
+                    </h2>
+                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${me?.isReady ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                        {me?.isReady ? 'READY' : 'CHOOSING'}
+                    </span>
+                 </div>
 
-      {status.connected && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1">
-          {/* Faction Selection */}
-          <div className="bg-white rounded-2xl shadow-xl p-6 border-2 border-green-100 overflow-y-auto max-h-[60vh]">
-            <h2 className="text-2xl font-bold mb-4 text-gray-800 flex items-center gap-2">
-                <Shield className="text-green-600" /> Choose Faction
-            </h2>
-            <div className="grid grid-cols-1 gap-4">
-              {Object.keys(FACTIONS).map((f) => {
-                const faction = FACTIONS[f as FactionType];
-                const isSelected = me?.faction === f;
-                return (
-                  <div 
-                    key={f}
-                    onClick={() => !me?.isReady && onFactionSelect(f)}
-                    className={`p-4 rounded-xl border-2 cursor-pointer transition-all transform hover:scale-[1.02] ${isSelected ? 'border-green-500 bg-green-50 ring-2 ring-green-200' : 'border-gray-200 hover:border-green-300'}`}
-                  >
-                    <div className="flex justify-between items-center mb-2">
-                        <h3 className="font-bold text-lg text-gray-800">{faction.name}</h3>
-                        {isSelected && <CheckCircle className="text-green-500" size={20} />}
-                    </div>
-                    <p className="text-sm text-gray-600 mb-2">{faction.description}</p>
-                    <div className="text-xs font-semibold text-green-700 bg-green-100 p-2 rounded">
-                        Abililty: {faction.specialAbility}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            
-            <button 
-                onClick={onReady}
-                disabled={!me?.faction}
-                className={`w-full mt-6 py-4 rounded-xl font-bold text-lg transition-all shadow-md ${me?.isReady ? 'bg-red-500 hover:bg-red-600 text-white' : 'bg-green-600 hover:bg-green-700 text-white disabled:bg-gray-300 disabled:text-gray-500'}`}
-            >
-                {me?.isReady ? 'Unready' : 'Ready Up'}
-            </button>
+                 <div className="space-y-3 overflow-y-auto max-h-[50vh] pr-2 scrollbar-hide flex-1">
+                    {Object.keys(FACTIONS).map((f) => {
+                        const faction = FACTIONS[f as FactionType];
+                        const isSelected = me?.faction === f;
+                        return (
+                        <div 
+                            key={f}
+                            onClick={() => !me?.isReady && onFactionSelect(f)}
+                            className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${isSelected ? 'border-green-500 bg-green-50 ring-2 ring-green-200' : 'border-gray-200 hover:border-green-300 hover:bg-gray-50'} ${me?.isReady ? 'opacity-60 cursor-not-allowed' : ''}`}
+                        >
+                            <div className="flex justify-between items-center mb-1">
+                                <h3 className="font-bold text-gray-900">{faction.name}</h3>
+                                {isSelected && <CheckCircle className="text-green-500" size={18} />}
+                            </div>
+                            <p className="text-xs text-gray-500 mb-2">{faction.description}</p>
+                            <div className="text-[10px] font-bold text-green-700 bg-green-100 p-1.5 rounded inline-block">
+                                {faction.specialAbility}
+                            </div>
+                        </div>
+                        );
+                    })}
+                </div>
+
+                <button 
+                    onClick={onReady}
+                    disabled={!me?.faction}
+                    className={`w-full mt-4 py-4 rounded-xl font-bold text-lg transition-all shadow-md flex items-center justify-center gap-2
+                        ${me?.isReady 
+                            ? 'bg-red-50 text-red-600 border-2 border-red-100 hover:bg-red-100' 
+                            : 'bg-green-600 text-white hover:bg-green-700 hover:shadow-lg disabled:bg-gray-300 disabled:text-gray-500 disabled:shadow-none'}
+                    `}
+                >
+                    {me?.isReady ? 'Cancel Ready' : 'Lock In & Ready'}
+                </button>
+              </div>
           </div>
 
-          {/* Chat & Status */}
-          <div className="flex flex-col gap-6">
-             <div className="bg-white rounded-2xl shadow-xl p-6 border-2 border-green-100 flex-1 flex flex-col min-h-[300px]">
-                <h2 className="text-xl font-bold mb-4 text-gray-800 flex items-center gap-2">
-                    <Users className="text-green-600" /> Lobby Chat
+          {/* Middle: VS Status */}
+          <div className="lg:col-span-2 flex flex-col items-center justify-center gap-4">
+               <div className="text-4xl font-black text-gray-300">VS</div>
+               {status.startCountdown !== null && (
+                    <div className="bg-white p-4 rounded-2xl shadow-2xl border-4 border-green-500 animate-bounce">
+                        <div className="text-sm font-bold text-gray-500 text-center uppercase tracking-wider mb-1">Starting in</div>
+                        <div className="text-6xl font-black text-green-600 text-center leading-none">{status.startCountdown}</div>
+                    </div>
+                )}
+          </div>
+
+          {/* Right Column: Opponent Status & Chat */}
+          <div className="lg:col-span-5 flex flex-col gap-4">
+             {/* Opponent Card */}
+             <div className="bg-white rounded-2xl shadow-lg p-6 border-2 border-gray-100">
+                 <h3 className="text-sm font-bold text-gray-500 uppercase tracking-widest mb-4">Opponent</h3>
+                 {opponent ? (
+                     <div className="flex items-center justify-between">
+                         <div>
+                             <div className="font-bold text-xl text-gray-800">{opponent.faction ? FACTIONS[opponent.faction as FactionType].name : 'Choosing...'}</div>
+                             <div className="text-sm text-gray-500">Player 2</div>
+                         </div>
+                         <div className={`px-4 py-2 rounded-xl font-bold text-sm ${opponent.isReady ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-gray-100 text-gray-500 border border-gray-200'}`}>
+                             {opponent.isReady ? 'READY' : 'NOT READY'}
+                         </div>
+                     </div>
+                 ) : (
+                     <div className="text-gray-400 italic">Opponent disconnected...</div>
+                 )}
+             </div>
+
+             {/* Chat */}
+             <div className="bg-white rounded-2xl shadow-xl p-4 border-2 border-green-100 flex-1 flex flex-col min-h-[300px]">
+                <h2 className="text-lg font-bold mb-2 text-gray-800 flex items-center gap-2">
+                    <Users size={18} className="text-green-600" /> Chat
                 </h2>
-                <div className="flex-1 overflow-y-auto mb-4 bg-gray-50 rounded-lg p-4 space-y-2 h-48 border border-gray-100">
+                <div className="flex-1 overflow-y-auto mb-3 bg-gray-50 rounded-xl p-3 space-y-2 h-0 border border-gray-100">
                     {chatMessages.map((msg: any, i: number) => (
-                        <div key={i} className={`p-2 rounded-lg max-w-[80%] text-sm ${msg.senderId === myPlayerId ? 'bg-green-100 ml-auto text-green-900 rounded-br-none' : 'bg-white border border-gray-200 mr-auto text-gray-800 rounded-bl-none'}`}>
+                        <div key={i} className={`p-2 rounded-xl max-w-[85%] text-sm ${msg.senderId === myPlayerId ? 'bg-green-600 text-white ml-auto rounded-br-sm' : 'bg-white border border-gray-200 mr-auto text-gray-800 rounded-bl-sm shadow-sm'}`}>
                             {msg.text}
                         </div>
                     ))}
+                    {chatMessages.length === 0 && <div className="text-center text-gray-300 text-sm mt-4 italic">Say hello!</div>}
                 </div>
                 <div className="flex gap-2">
                     <input 
-                        className="flex-1 border-2 border-gray-200 rounded-lg p-3 text-sm focus:outline-none focus:border-green-500"
+                        className="flex-1 bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100 transition-all"
                         placeholder="Type a message..."
                         onKeyDown={(e) => {
                             if (e.key === 'Enter') {
@@ -287,34 +354,6 @@ const Lobby = ({ myId, peerIdInput, setPeerIdInput, joinGame, players, myPlayerI
                     />
                 </div>
              </div>
-
-             {/* Status Card */}
-            <div className="bg-white rounded-2xl shadow-xl p-6 border-2 border-green-100">
-                <h3 className="font-bold text-gray-700 mb-4">Players</h3>
-                <div className="space-y-3">
-                    <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                        <span className="font-medium text-gray-700">You ({me?.faction || 'Selecting...'})</span>
-                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${me?.isReady ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                            {me?.isReady ? 'READY' : 'NOT READY'}
-                        </span>
-                    </div>
-                     <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                        <span className="font-medium text-gray-700">Opponent ({opponent ? (opponent.faction || 'Selecting...') : 'Waiting...'})</span>
-                         {opponent && (
-                            <span className={`px-3 py-1 rounded-full text-xs font-bold ${opponent.isReady ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                                {opponent.isReady ? 'READY' : 'NOT READY'}
-                            </span>
-                         )}
-                    </div>
-                </div>
-                
-                {status.startCountdown !== null && (
-                    <div className="mt-6 text-center">
-                        <p className="text-gray-600 font-semibold mb-2">Game starting in</p>
-                        <div className="text-5xl font-black text-green-600 animate-pulse">{status.startCountdown}</div>
-                    </div>
-                )}
-            </div>
           </div>
         </div>
       )}
@@ -670,6 +709,7 @@ export default function App() {
   const [view, setView] = useState<'HOME' | 'HOW_TO_PLAY' | 'APP'>('HOME');
   const [myId, setMyId] = useState<string>('');
   const [peerIdInput, setPeerIdInput] = useState('');
+  const [isHost, setIsHost] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState({ connected: false, startCountdown: null as number | null });
   const [chatMessages, setChatMessages] = useState<any[]>([]);
   const [activeAnimation, setActiveAnimation] = useState<any>(null);
@@ -1185,8 +1225,8 @@ export default function App() {
   if (view === 'HOME') {
     return (
       <HomeScreen 
-        onCreate={() => setView('APP')}
-        onJoin={() => setView('APP')}
+        onCreate={() => { setIsHost(true); setView('APP'); }}
+        onJoin={() => { setIsHost(false); setView('APP'); }}
         onHowToPlay={() => setView('HOW_TO_PLAY')}
       />
     );
@@ -1196,6 +1236,7 @@ export default function App() {
     return (
       <Lobby 
         myId={myId}
+        isHost={isHost}
         peerIdInput={peerIdInput}
         setPeerIdInput={setPeerIdInput}
         joinGame={joinGame}
@@ -1206,6 +1247,7 @@ export default function App() {
         chatMessages={chatMessages}
         sendChat={sendChat}
         status={connectionStatus}
+        onBack={() => setView('HOME')}
       />
     );
   }
