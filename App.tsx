@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { NetworkMessage, GameState, PlayerState, Unit, BuildOrder, FactionType, UnitStats } from './types';
+import { NetworkMessage, GameState, PlayerState, Unit, BuildOrder, FactionType } from './types';
 import { peerService } from './services/peerService';
 import { FACTIONS, BOARD_SIZE, INITIAL_UNLOCKS } from './constants';
-import { calculateResources, getPylonOwner, getPylonHealth, isSpaceOwned } from './services/gameLogic';
+import { calculateResources, isSpaceOwned } from './services/gameLogic';
 import { Zap, Shield, Sword, Hammer, Settings, Users, Play, Clock, CheckCircle, ArrowLeft, BookOpen, Copy, Check, Loader2 } from 'lucide-react';
 
 // --- NEW COMPONENTS ---
