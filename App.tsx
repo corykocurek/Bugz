@@ -132,9 +132,11 @@ const UnitArt = ({ unit, factionType, animation }: { unit: Unit, factionType: Fa
             className={`w-full h-full drop-shadow-lg ${animClass}`}
             style={{ transformOrigin: 'center' }}
         >
-            {renderLegs()}
-            {renderBody()}
-            {renderWeapon()}
+            <g transform={`translate(50,50) scale(${scale}) translate(-50,-50)`}>
+                {renderLegs()}
+                {renderBody()}
+                {renderWeapon()}
+            </g>
             
             {/* Health Bar Ring */}
             <circle cx="50" cy="50" r="45" fill="none" stroke="rgba(0,0,0,0.2)" strokeWidth="3" />
@@ -1208,7 +1210,7 @@ export default function App() {
 
   const handlePhaseEnd = (phase: string) => {
       if (phase === 'BUILDING') {
-          if (myId === gameState.players[0].id) { // Is Host
+          if (myId === gameState.players[0].id) {
                setHostOrders(buildOrders);
                if (clientOrders) {
                    // Both ready
