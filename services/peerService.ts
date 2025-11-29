@@ -12,7 +12,9 @@ export class PeerService {
   }
 
   public initialize(onOpen: (id: string) => void) {
-    this.peer = new Peer();
+    this.peer = new Peer({
+      debug: 2 // Log errors and warnings
+    });
 
     this.peer.on('open', (id) => {
       console.log('My peer ID is: ' + id);
@@ -23,14 +25,30 @@ export class PeerService {
       this.handleConnection(conn);
     });
 
+    // Handle signaling server disconnection (tabbing out/sleep)
+    this.peer.on('disconnected', () => {
+      console.log('Disconnected from signaling server, reconnecting...');
+      this.peer?.reconnect();
+    });
+
     this.peer.on('error', (err) => {
       console.error(err);
     });
   }
 
-  public connect(peerId: string) {
+  public connect(peerId: string, onConnected?: () => void) {
     if (!this.peer) return;
-    const conn = this.peer.connect(peerId);
+    
+    // Create connection
+    const conn = this.peer.connect(peerId, {
+      reliable: true
+    });
+
+    // Hook into open event specifically for the initiator
+    conn.on('open', () => {
+      if (onConnected) onConnected();
+    });
+
     this.handleConnection(conn);
   }
 
@@ -52,11 +70,18 @@ export class PeerService {
       console.log('Connection closed');
       // Handle disconnect
     });
+    
+    // Ensure we handle errors on the connection itself
+    this.conn.on('error', (err) => {
+      console.error('Connection error:', err);
+    });
   }
 
   public sendMessage(msg: NetworkMessage) {
     if (this.conn && this.conn.open) {
       this.conn.send(msg);
+    } else {
+      console.warn('Cannot send message, connection not open');
     }
   }
 

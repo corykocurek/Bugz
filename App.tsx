@@ -3,7 +3,7 @@ import { NetworkMessage, GameState, PlayerState, Unit, BuildOrder, FactionType, 
 import { peerService } from './services/peerService';
 import { FACTIONS, BOARD_SIZE, INITIAL_UNLOCKS } from './constants';
 import { calculateResources, getPylonOwner, getPylonHealth, isSpaceOwned } from './services/gameLogic';
-import { Zap, Shield, Sword, Hammer, Settings, Users, Play, Clock, CheckCircle, ArrowLeft, BookOpen, Copy, Check } from 'lucide-react';
+import { Zap, Shield, Sword, Hammer, Settings, Users, Play, Clock, CheckCircle, ArrowLeft, BookOpen, Copy, Check, Loader2 } from 'lucide-react';
 
 // --- NEW COMPONENTS ---
 
@@ -178,7 +178,7 @@ const HomeScreen = ({ onCreate, onJoin, onHowToPlay }: any) => {
 
 // --- EXISTING COMPONENTS ---
 
-const Lobby = ({ myId, isHost, peerIdInput, setPeerIdInput, joinGame, players, myPlayerId, onReady, onFactionSelect, chatMessages, sendChat, status, onBack }: any) => {
+const Lobby = ({ myId, isHost, peerIdInput, setPeerIdInput, joinGame, isConnecting, players, myPlayerId, onReady, onFactionSelect, chatMessages, sendChat, status, onBack }: any) => {
   const me = players.find((p: PlayerState) => p.id === myPlayerId);
   const opponent = players.find((p: PlayerState) => p.id !== myPlayerId);
   const [copied, setCopied] = useState(false);
@@ -237,10 +237,14 @@ const Lobby = ({ myId, isHost, peerIdInput, setPeerIdInput, joinGame, players, m
                         />
                         <button 
                             onClick={joinGame}
-                            disabled={!peerIdInput}
+                            disabled={!peerIdInput || isConnecting}
                             className="w-full bg-green-600 text-white px-6 py-4 rounded-xl font-bold text-xl hover:bg-green-700 transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                         >
-                            <Play fill="currentColor" /> Join Game
+                            {isConnecting ? (
+                                <><Loader2 className="animate-spin" /> Connecting...</>
+                            ) : (
+                                <><Play fill="currentColor" /> Join Game</>
+                            )}
                         </button>
                        </>
                    )}
@@ -361,348 +365,194 @@ const Lobby = ({ myId, isHost, peerIdInput, setPeerIdInput, joinGame, players, m
   );
 };
 
-// Main Game Component
-const Game = ({ state, playerId, onBuildOrder, onEndPhase, activeAnimation }: any) => {
-    const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
-    const [menuTab, setMenuTab] = useState<'build' | 'tech'>('build');
-    const [startTimer, setStartTimer] = useState<number | null>(3);
-    const [hasEndedPhase, setHasEndedPhase] = useState(false);
-    
-    // Derived
-    const me = state.players.find((p: PlayerState) => p.id === playerId);
-    const opponent = state.players.find((p: PlayerState) => p.id !== playerId);
-    const myFactionData = me ? FACTIONS[me.faction as FactionType] : null;
-    
-    // Start countdown effect
-    useEffect(() => {
-        if (state.phase === 'STARTING') {
-             const int = setInterval(() => {
-                 setStartTimer(prev => {
-                     if (prev === 1) return 1;
-                     return (prev || 0) - 1;
-                 })
-             }, 1000);
-             return () => clearInterval(int);
-        } else {
-            setStartTimer(null);
-        }
-    }, [state.phase]);
+const Game = ({ state, playerId, onBuildOrder, onEndPhase, activeAnimation }: {
+  state: GameState,
+  playerId: string,
+  onBuildOrder: (order: BuildOrder) => void,
+  onEndPhase: () => void,
+  activeAnimation: any
+}) => {
+  const me = state.players.find((p) => p.id === playerId);
+  const opponent = state.players.find((p) => p.id !== playerId);
+  const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
 
-    // Reset local phase ready state when phase changes
-    useEffect(() => {
-        setHasEndedPhase(false);
-        setSelectedUnitId(null);
-    }, [state.phase]);
-    
-    const handleCellClick = (x: number, y: number) => {
-        if (state.phase !== 'BUILDING') return;
-        if (hasEndedPhase) return;
+  if (!me || !opponent) return <div className="min-h-screen flex items-center justify-center text-green-800 font-bold text-xl">Loading Game State...</div>;
 
-        // Check if building a unit
-        if (selectedUnitId) {
-            // Validate: Must be in owned zone (except Queen, but units build in owned zone)
-            const owned = isSpaceOwned(x, y, state.pylons, playerId, state);
-            if (!owned) {
-                alert("Can only build in your territory");
-                return;
-            }
-            // Check occupancy
-            const occupied = state.units.some((u: Unit) => u.x === x && u.y === y);
-            if (occupied) {
-                alert("Space occupied");
-                return;
-            }
-            
-            // Send build order
-            const unitDef = myFactionData?.units.find((u: UnitStats) => u.id === selectedUnitId);
-            if (!unitDef) return;
-            
-            if (me.resources < unitDef.cost) {
-                alert("Not enough resources");
-                return;
-            }
-            
-            // Deduct locally for feedback (actual state update comes from logic sync)
-            onBuildOrder({
-                unitId: selectedUnitId,
-                targetX: x,
-                targetY: y,
-                type: 'BUILD_UNIT'
-            });
-            setSelectedUnitId(null);
-        }
-    };
+  const myFaction = FACTIONS[me.faction as FactionType];
 
-    const handleUnlock = (unitId: string, cost: number) => {
-        if (me.resources >= cost) {
-             onBuildOrder({
-                unitId: unitId,
-                targetX: -1,
-                targetY: -1,
-                type: 'UNLOCK_TECH'
-            });
-        }
-    };
-
-    const renderBoard = () => {
-        const grid = [];
-        for(let y=0; y<BOARD_SIZE; y++) {
-            for(let x=0; x<BOARD_SIZE; x++) {
-                // Check ownership for background color
-                const ownedByMe = isSpaceOwned(x, y, state.pylons, playerId, state);
-                const ownedByOpp = isSpaceOwned(x, y, state.pylons, opponent.id, state);
-                
-                let bgClass = "bg-white/50"; // Picnic pattern handled by parent
-                if (ownedByMe) bgClass = "bg-green-500/30";
-                if (ownedByOpp) bgClass = "bg-red-500/30";
-
-                const unit = state.units.find((u: Unit) => u.x === x && u.y === y);
-                
-                // Animation Classes
-                let animationClass = "";
-                let innerAnimationClass = "animate-idle"; // Default idle
-
-                if (unit) {
-                    // Check if this unit is currently acting
-                    if (activeAnimation && activeAnimation.attackerId === unit.instanceId) {
-                         innerAnimationClass = ""; // Stop idle
-                         if (activeAnimation.type === 'ATTACK') {
-                             if (activeAnimation.direction === 'UP') animationClass = "animate-lunge-up";
-                             if (activeAnimation.direction === 'DOWN') animationClass = "animate-lunge-down";
-                             if (activeAnimation.direction === 'LEFT') animationClass = "animate-lunge-left";
-                             if (activeAnimation.direction === 'RIGHT') animationClass = "animate-lunge-right";
-                         } else if (activeAnimation.type === 'MOVE') {
-                             if (activeAnimation.direction === 'UP') animationClass = "animate-move-up";
-                             if (activeAnimation.direction === 'DOWN') animationClass = "animate-move-down";
-                             if (activeAnimation.direction === 'LEFT') animationClass = "animate-move-left";
-                             if (activeAnimation.direction === 'RIGHT') animationClass = "animate-move-right";
-                         }
-                    } else if (activeAnimation && activeAnimation.targetId === unit.instanceId) {
-                         innerAnimationClass = ""; // Stop idle
-                         if (activeAnimation.type === 'DEATH') {
-                             animationClass = "animate-death";
-                         } else {
-                             animationClass = "animate-shake";
-                         }
-                    }
-                }
-
-                const renderPylon = (px: number, py: number, posClass: string) => {
-                    const val = state.pylons[px][py];
-                    if (val === 0) return null;
-                    const hp = getPylonHealth(val);
-                    const owner = getPylonOwner(val, state.players);
-                    const isMine = owner === playerId;
-                    return (
-                        <div className={`absolute ${posClass} w-3 h-3 md:w-4 md:h-4 rounded-full border border-gray-600 flex items-center justify-center text-[8px] font-bold text-white shadow-sm z-10
-                            ${isMine ? 'bg-blue-500' : 'bg-red-500'}
-                        `}>
-                            {hp}
-                        </div>
-                    );
-                };
-
-                grid.push(
-                    <div 
-                        key={`${x},${y}`} 
-                        className={`relative border border-gray-300/50 w-full h-full aspect-square flex items-center justify-center ${bgClass} hover:bg-white/60 transition-colors`}
-                        onClick={() => handleCellClick(x, y)}
-                    >
-                        {/* Pylons */}
-                        {renderPylon(x, y, "top-[-6px] left-[-6px]")}
-                        {renderPylon(x+1, y, "top-[-6px] right-[-6px]")}
-                        {renderPylon(x, y+1, "bottom-[-6px] left-[-6px]")}
-                        {renderPylon(x+1, y+1, "bottom-[-6px] right-[-6px]")}
-                        
-                        {/* Unit */}
-                        {unit && (
-                             <div className={`w-3/4 h-3/4 ${animationClass} z-20`}>
-                                 <div className={`w-full h-full rounded-lg shadow-md flex flex-col items-center justify-center text-xs font-bold relative ${innerAnimationClass}
-                                    ${unit.ownerId === playerId ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}
-                                 `}>
-                                     {/* Unit Icon based on type */}
-                                     {unit.type === 'Builder' && <Hammer size={12} />}
-                                     {unit.type === 'Pounder' && <Hammer size={12} className="rotate-45" />}
-                                     {unit.type === 'Striker' && <Sword size={12} />}
-                                     
-                                     <span className="text-[8px] md:text-[10px]">{unit.name.substring(0,3)}</span>
-                                     
-                                     {/* Health Bar */}
-                                     <div className="absolute bottom-0 w-full h-1 bg-gray-700 rounded-b-lg overflow-hidden">
-                                         <div className="h-full bg-green-300" style={{width: `${(unit.currentHealth / unit.maxHealth) * 100}%`}}></div>
-                                     </div>
-                                 </div>
-                             </div>
-                        )}
-                    </div>
-                );
-            }
-        }
-        return grid;
-    };
-
-    if (state.phase === 'STARTING' && startTimer) {
-        return (
-            <div className="flex items-center justify-center min-h-screen bg-green-50">
-                <div className="text-9xl font-black text-green-600 animate-ping">{startTimer}</div>
-            </div>
-        );
+  const handleCellClick = (x: number, y: number) => {
+    if (state.phase === 'BUILDING' && selectedUnitId) {
+       const owned = isSpaceOwned(x, y, state.pylons, playerId, state);
+       const occupied = state.units.some(u => u.x === x && u.y === y);
+       
+       if (owned && !occupied) {
+           const unitStats = myFaction.units.find(u => u.id === selectedUnitId);
+           if (unitStats && me.resources >= unitStats.cost) {
+               onBuildOrder({
+                   unitId: selectedUnitId,
+                   targetX: x,
+                   targetY: y,
+                   type: 'BUILD_UNIT'
+               });
+               // Optional: keep selected to build multiple, or deselect
+               // setSelectedUnitId(null); 
+           }
+       }
     }
+  };
 
-    if (state.phase === 'GAME_OVER') {
-        const iWon = state.winnerId === playerId;
-        return (
-             <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-white p-6">
-                <h1 className={`text-6xl font-black mb-8 ${iWon ? 'text-green-500' : 'text-red-500'}`}>{iWon ? 'VICTORY' : 'DEFEAT'}</h1>
-                
-                <div className="bg-gray-800 p-8 rounded-2xl max-w-lg w-full mb-8">
-                    <h2 className="text-2xl font-bold mb-6 border-b border-gray-700 pb-2">Battle Report</h2>
-                    <div className="space-y-4">
-                         <div className="flex justify-between">
-                            <span>Units Built:</span>
-                            <span className="font-mono text-xl">{me?.unitsBuilt}</span>
-                        </div>
-                        <div className="flex justify-between">
-                            <span>Units Killed:</span>
-                            <span className="font-mono text-xl">{me?.unitsKilled}</span>
-                        </div>
-                    </div>
-                </div>
-
-                <button onClick={() => window.location.reload()} className="bg-white text-gray-900 px-8 py-4 rounded-xl font-bold text-xl hover:bg-gray-200 transition-colors">
-                    Return to Main Menu
-                </button>
-             </div>
-        )
-    }
-
-    return (
-        <div className="flex flex-col h-screen bg-gray-100 overflow-hidden">
-             {/* Header HUD */}
-             <div className="bg-white shadow-md p-2 flex justify-between items-center z-10 px-4">
-                 <div className="flex items-center gap-4">
-                     <div className="flex flex-col">
-                        <span className="text-xs text-gray-500 uppercase font-bold">Phase</span>
-                        <span className={`font-bold text-lg ${state.phase === 'ACTION' ? 'text-red-600' : 'text-blue-600'}`}>{state.phase}</span>
-                     </div>
-                     <div className="flex flex-col items-center bg-gray-100 px-3 py-1 rounded">
-                         <Clock size={14} className="text-gray-500"/>
-                         <span className="font-mono font-bold">{state.phaseTimeRemaining}s</span>
-                     </div>
-                 </div>
-                 
-                 <div className="flex items-center gap-6">
-                     <div className="flex items-center gap-2">
-                         <div className="bg-yellow-400 p-2 rounded-lg shadow-sm">
-                             <div className="w-3 h-3 bg-white rounded-sm"></div>
-                         </div>
-                         <div className="flex flex-col">
-                             <span className="text-xs font-bold text-gray-500">Resources</span>
-                             <span className="text-2xl font-black text-gray-800 leading-none">{me?.resources}</span>
-                         </div>
-                     </div>
-                 </div>
-             </div>
-             
-             {/* Main Content */}
-             <div className="flex-1 flex overflow-hidden relative">
-                  {/* Game Board */}
-                  <div className="flex-1 flex items-center justify-center bg-green-800 p-2 md:p-8 overflow-auto">
-                      <div className="picnic-pattern shadow-2xl border-8 border-white rounded-lg relative" style={{width: 'min(90vw, 60vh)', height: 'min(90vw, 60vh)'}}>
-                          <div className="grid grid-cols-7 grid-rows-7 w-full h-full">
-                              {renderBoard()}
+  const renderBoard = () => {
+      const grid = [];
+      for(let y=0; y<BOARD_SIZE; y++) {
+          for(let x=0; x<BOARD_SIZE; x++) {
+              const ownedByMe = isSpaceOwned(x, y, state.pylons, playerId, state);
+              const ownedByOpponent = isSpaceOwned(x, y, state.pylons, opponent.id, state);
+              
+              let bgClass = "bg-green-50";
+              if (ownedByMe) bgClass = "bg-green-200"; 
+              if (ownedByOpponent) bgClass = "bg-red-100";
+              
+              const unit = state.units.find(u => u.x === x && u.y === y);
+              
+              grid.push(
+                  <div 
+                    key={`${x}-${y}`} 
+                    className={`w-12 h-12 md:w-16 md:h-16 border border-green-200 relative flex items-center justify-center cursor-pointer transition-colors ${bgClass}`}
+                    onClick={() => handleCellClick(x, y)}
+                  >
+                      {/* Unit */}
+                      {unit && (
+                          <div className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center text-xs font-bold shadow-md relative z-10 transition-transform duration-300
+                              ${unit.ownerId === playerId ? 'bg-green-600 text-white' : 'bg-red-500 text-white'}
+                              ${activeAnimation?.targetId === unit.instanceId && activeAnimation.type === 'ATTACK' ? 'animate-bounce' : ''}
+                          `}>
+                              {unit.name.substring(0,2)}
+                              {/* HP Bar */}
+                              <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-8 h-1 bg-gray-200 rounded-full overflow-hidden">
+                                  <div className={`h-full ${unit.ownerId === playerId ? 'bg-green-400' : 'bg-red-300'}`} style={{width: `${(unit.currentHealth / unit.maxHealth) * 100}%`}}></div>
+                              </div>
                           </div>
-                      </div>
+                      )}
+                      
+                      {/* Selection Highlight */}
+                      {state.phase === 'BUILDING' && selectedUnitId && ownedByMe && !unit && (
+                          <div className="absolute inset-0 bg-green-500/20 hover:bg-green-500/40 transition-colors"></div>
+                      )}
                   </div>
-                  
-                  {/* Phase Overlay/Controls */}
-                  {state.phase === 'BUILDING' && (
-                       <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 w-[90%] max-w-md bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col max-h-[40vh] z-20 overflow-hidden">
-                           <div className="flex border-b border-gray-200">
-                               <button 
-                                onClick={() => setMenuTab('build')}
-                                className={`flex-1 py-3 font-bold text-sm uppercase ${menuTab === 'build' ? 'bg-green-50 text-green-700 border-b-2 border-green-500' : 'text-gray-500'}`}
-                               >Build Units</button>
-                               <button 
-                                onClick={() => setMenuTab('tech')}
-                                className={`flex-1 py-3 font-bold text-sm uppercase ${menuTab === 'tech' ? 'bg-green-50 text-green-700 border-b-2 border-green-500' : 'text-gray-500'}`}
-                               >Tech Tree</button>
-                           </div>
-                           
-                           <div className="p-4 overflow-y-auto flex-1">
-                               {hasEndedPhase ? (
-                                   <div className="text-center text-gray-500 italic py-8">Waiting for opponent...</div>
-                               ) : (
-                                   <>
-                                   {menuTab === 'build' && (
-                                       <div className="grid grid-cols-1 gap-2">
-                                           {myFactionData?.units.filter(u => me?.unlockedUnits.includes(u.id)).map(u => (
-                                               <div 
-                                                key={u.id}
-                                                onClick={() => setSelectedUnitId(u.id === selectedUnitId ? null : u.id)}
-                                                className={`flex justify-between items-center p-3 rounded-lg border cursor-pointer ${selectedUnitId === u.id ? 'border-green-500 bg-green-50 ring-1 ring-green-300' : 'border-gray-200'}`}
-                                               >
-                                                   <div>
-                                                       <div className="font-bold">{u.name}</div>
-                                                       <div className="text-xs text-gray-500">A:{u.attack} H:{u.health} M:{u.move} W:{u.work}</div>
-                                                   </div>
-                                                   <div className="font-bold text-green-700 flex items-center gap-1">
-                                                       {u.cost} <div className="w-2 h-2 bg-yellow-400 inline-block rounded-sm"></div>
-                                                   </div>
-                                               </div>
-                                           ))}
-                                       </div>
-                                   )}
-                                   {menuTab === 'tech' && (
-                                       <div className="grid grid-cols-1 gap-2">
-                                           {myFactionData?.units.filter(u => !me?.unlockedUnits.includes(u.id)).map(u => (
-                                               <div key={u.id} className="flex justify-between items-center p-3 rounded-lg border border-gray-200 bg-gray-50">
-                                                    <div>
-                                                       <div className="font-bold text-gray-700">{u.name}</div>
-                                                       <div className="text-xs text-gray-500">Unlock Cost: {Math.floor(u.cost * 1.5)}</div>
-                                                   </div>
-                                                   <button 
-                                                    onClick={() => handleUnlock(u.id, Math.floor(u.cost * 1.5))}
-                                                    disabled={me?.resources < Math.floor(u.cost * 1.5)}
-                                                    className="bg-blue-600 text-white px-3 py-1 rounded text-sm font-bold disabled:opacity-50"
-                                                   >
-                                                       Unlock
-                                                   </button>
-                                               </div>
-                                           ))}
-                                           {myFactionData?.units.every(u => me?.unlockedUnits.includes(u.id)) && (
-                                               <div className="text-center text-gray-400 py-4">All tech unlocked!</div>
-                                           )}
-                                       </div>
-                                   )}
-                                   </>
-                               )}
-                           </div>
-                           
-                           <div className="p-3 border-t border-gray-100 bg-gray-50">
-                               <button 
-                                onClick={() => { setHasEndedPhase(true); onEndPhase(); }}
-                                disabled={hasEndedPhase}
-                                className="w-full bg-green-600 text-white py-3 rounded-xl font-bold hover:bg-green-700 disabled:bg-gray-400 transition-colors shadow-sm"
-                               >
-                                   {hasEndedPhase ? 'Ready & Waiting' : 'Finish Phase'}
-                               </button>
-                           </div>
-                       </div>
-                  )}
-                  
-                  {state.phase === 'RESOURCE' && (
-                       <div className="absolute inset-0 bg-black/50 z-30 flex items-center justify-center">
-                           <div className="bg-white p-8 rounded-2xl shadow-2xl text-center transform scale-100 animate-bounce-slow">
-                               <h2 className="text-3xl font-black text-green-600 mb-2">Resource Phase</h2>
-                               <p className="text-gray-600 text-lg">Collecting picnic supplies...</p>
-                               <div className="mt-4 text-5xl font-mono font-bold text-yellow-500">+{me?.lastCollected || 0}</div>
-                           </div>
-                       </div>
-                  )}
+              );
+          }
+      }
+      return grid;
+  };
+
+  return (
+    <div className="min-h-screen bg-green-50 flex flex-col font-sans overflow-hidden">
+        {/* HUD */}
+        <div className="bg-white p-4 shadow-sm border-b border-green-100 flex justify-between items-center z-20">
+            <div className="flex items-center gap-4">
+                <div>
+                    <h2 className="text-lg font-black text-green-800 leading-none">{myFaction?.name}</h2>
+                    <div className="text-xs text-green-600 font-bold uppercase tracking-wider">{me.name}</div>
+                </div>
+                <div className="h-8 w-px bg-gray-200"></div>
+                <div className="flex flex-col">
+                    <span className="text-xs text-gray-400 uppercase font-bold">Resources</span>
+                    <span className="text-xl font-mono font-bold text-yellow-600 leading-none">{me.resources}</span>
+                </div>
+            </div>
+
+            <div className="flex flex-col items-center">
+                 <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Phase</div>
+                 <div className={`px-4 py-1 rounded-full text-sm font-bold border ${
+                     state.phase === 'ACTION' ? 'bg-red-100 text-red-600 border-red-200 animate-pulse' :
+                     state.phase === 'BUILDING' ? 'bg-blue-100 text-blue-600 border-blue-200' :
+                     'bg-yellow-100 text-yellow-600 border-yellow-200'
+                 }`}>
+                     {state.phase}
+                 </div>
+                 {state.phaseTimeRemaining > 0 && <div className="text-xs font-mono text-gray-400 mt-1">{state.phaseTimeRemaining}s</div>}
+            </div>
+
+            <div className="text-right">
+                <div className="text-sm font-bold text-red-500">Opponent</div>
+                <div className="text-xs text-gray-400">Units: {opponent.unitsBuilt}</div>
+            </div>
+        </div>
+
+        {/* Board Container */}
+        <div className="flex-1 overflow-auto flex justify-center items-center p-4 relative">
+             <div className="relative">
+                {/* Winner Overlay */}
+                {state.winnerId && (
+                    <div className="absolute inset-0 z-50 flex items-center justify-center bg-white/80 backdrop-blur-sm rounded-xl">
+                        <div className="bg-white p-8 rounded-2xl shadow-2xl border-4 border-green-500 text-center animate-in zoom-in duration-300">
+                            <h1 className="text-5xl font-black mb-2 text-green-800">{state.winnerId === playerId ? 'VICTORY!' : 'DEFEAT'}</h1>
+                            <p className="text-gray-500 mb-6">The Queen has fallen.</p>
+                            <button onClick={() => window.location.reload()} className="bg-green-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-green-700 shadow-lg">
+                                Return to Menu
+                            </button>
+                        </div>
+                    </div>
+                )}
+                
+                {/* The Grid */}
+                <div 
+                    className="grid gap-1 bg-green-800/10 p-2 rounded-xl border-4 border-green-800/20 shadow-xl"
+                    style={{ gridTemplateColumns: `repeat(${BOARD_SIZE}, minmax(0, 1fr))` }}
+                >
+                    {renderBoard()}
+                </div>
              </div>
         </div>
-    );
+
+        {/* Bottom Build Deck */}
+        {state.phase === 'BUILDING' && (
+            <div className="bg-white border-t border-green-100 p-2 safe-area-pb">
+                <div className="flex gap-2 overflow-x-auto pb-2 px-2 snap-x">
+                     {myFaction.units.map(u => {
+                         const canAfford = me.resources >= u.cost;
+                         return (
+                            <button 
+                                key={u.id}
+                                onClick={() => setSelectedUnitId(u.id === selectedUnitId ? null : u.id)}
+                                disabled={!canAfford}
+                                className={`flex-shrink-0 flex flex-col items-center p-2 rounded-xl border-2 min-w-[90px] transition-all snap-center
+                                    ${selectedUnitId === u.id 
+                                        ? 'border-green-500 bg-green-50 ring-2 ring-green-200' 
+                                        : 'border-gray-100 bg-white hover:border-green-200'}
+                                    ${!canAfford ? 'opacity-40 grayscale' : ''}
+                                `}
+                            >
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold mb-1 text-white
+                                    ${u.type === 'Striker' ? 'bg-red-500' : u.type === 'Pounder' ? 'bg-blue-500' : 'bg-orange-400'}
+                                `}>
+                                    {u.name.substring(0,1)}
+                                </div>
+                                <div className="font-bold text-xs text-gray-700 truncate w-full text-center">{u.name}</div>
+                                <div className="text-[10px] font-bold text-yellow-600 bg-yellow-50 px-2 py-0.5 rounded-full mt-1">{u.cost}</div>
+                            </button>
+                         )
+                     })}
+                     
+                     <div className="w-px bg-gray-200 mx-2 flex-shrink-0"></div>
+                     
+                     <button 
+                        onClick={onEndPhase} 
+                        className="flex-shrink-0 bg-green-600 hover:bg-green-700 text-white px-4 rounded-xl font-bold text-sm shadow-md transition-colors flex items-center justify-center text-center leading-tight"
+                     >
+                         Finish<br/>Turn
+                     </button>
+                </div>
+            </div>
+        )}
+        
+        {state.phase === 'ACTION' && (
+             <div className="bg-red-50 border-t border-red-100 p-4 text-center text-red-600 font-bold animate-pulse">
+                 Combat Phase - Observing...
+             </div>
+        )}
+    </div>
+  );
 };
 
 export default function App() {
@@ -710,6 +560,7 @@ export default function App() {
   const [myId, setMyId] = useState<string>('');
   const [peerIdInput, setPeerIdInput] = useState('');
   const [isHost, setIsHost] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState({ connected: false, startCountdown: null as number | null });
   const [chatMessages, setChatMessages] = useState<any[]>([]);
   const [activeAnimation, setActiveAnimation] = useState<any>(null);
@@ -1174,8 +1025,12 @@ export default function App() {
 
   // Setup Helpers
   const joinGame = () => {
-    peerService.connect(peerIdInput);
-    peerService.sendMessage({ type: 'JOIN', payload: { id: myId } });
+    if (!peerIdInput) return;
+    setIsConnecting(true);
+    peerService.connect(peerIdInput, () => {
+        setIsConnecting(false);
+        peerService.sendMessage({ type: 'JOIN', payload: { id: myId } });
+    });
   };
 
   const onFactionSelect = (f: FactionType) => {
@@ -1240,6 +1095,7 @@ export default function App() {
         peerIdInput={peerIdInput}
         setPeerIdInput={setPeerIdInput}
         joinGame={joinGame}
+        isConnecting={isConnecting}
         players={gameState.players}
         myPlayerId={myId}
         onReady={onReady}
