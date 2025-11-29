@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bugz</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      /* Custom Scrollbar for Chat */
+      .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+      }
+      .scrollbar-hide {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+      }
+      .picnic-pattern {
+        background-color: #ffffff;
+        background-image:
+          linear-gradient(45deg, #ffcccc 25%, transparent 25%, transparent 75%, #ffcccc 75%, #ffcccc),
+          linear-gradient(45deg, #ffcccc 25%, transparent 25%, transparent 75%, #ffcccc 75%, #ffcccc);
+        background-size: 40px 40px;
+        background-position: 0 0, 20px 20px;
+      }
+
+      /* Animations */
+      @keyframes idle {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.08); }
+      }
+      .animate-idle {
+        animation: idle 2s infinite ease-in-out;
+      }
+
+      @keyframes lunge-up {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-60%); }
+      }
+      @keyframes lunge-down {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(60%); }
+      }
+      @keyframes lunge-left {
+        0%, 100% { transform: translateX(0); }
+        50% { transform: translateX(-60%); }
+      }
+      @keyframes lunge-right {
+        0%, 100% { transform: translateX(0); }
+        50% { transform: translateX(60%); }
+      }
+
+      .animate-lunge-up { animation: lunge-up 0.4s ease-in-out; }
+      .animate-lunge-down { animation: lunge-down 0.4s ease-in-out; }
+      .animate-lunge-left { animation: lunge-left 0.4s ease-in-out; }
+      .animate-lunge-right { animation: lunge-right 0.4s ease-in-out; }
+
+      /* Movement Animations - Slide to next cell */
+      @keyframes move-up { to { transform: translateY(-100%); } }
+      @keyframes move-down { to { transform: translateY(100%); } }
+      @keyframes move-left { to { transform: translateX(-100%); } }
+      @keyframes move-right { to { transform: translateX(100%); } }
+
+      .animate-move-up { animation: move-up 0.5s forwards ease-in-out; z-index: 50; }
+      .animate-move-down { animation: move-down 0.5s forwards ease-in-out; z-index: 50; }
+      .animate-move-left { animation: move-left 0.5s forwards ease-in-out; z-index: 50; }
+      .animate-move-right { animation: move-right 0.5s forwards ease-in-out; z-index: 50; }
+
+      @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-5px) rotate(-5deg); }
+        75% { transform: translateX(5px) rotate(5deg); }
+      }
+      .animate-shake {
+        animation: shake 0.4s ease-in-out;
+        filter: saturate(300%) hue-rotate(-20deg); /* Flash red-ish effect */
+      }
+
+      @keyframes death {
+        0% { transform: scale(1) rotate(0deg); opacity: 1; filter: grayscale(0); }
+        100% { transform: scale(0) rotate(180deg); opacity: 0; filter: grayscale(100%); }
+      }
+      .animate-death {
+        animation: death 0.5s ease-in-out forwards;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.555.0",
+    "vite": "https://aistudiocdn.com/vite@^7.2.4",
+    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1",
+    "peerjs": "https://aistudiocdn.com/peerjs@^1.5.5"
+  }
+}
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>

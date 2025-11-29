@@ -1,0 +1,5 @@
+{
+  "name": "Bugz",
+  "description": "A 2-player turn-based strategy game where insect factions battle for picnic dominance.",
+  "requestFramePermissions": []
+}
